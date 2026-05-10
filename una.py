@@ -4,16 +4,7 @@ import multiprocessing
 import shutil
 from pathlib import Path
 from mods import colors
-
-def get_env(staging_dir: Path):
-    env = os.environ.copy()
-    # Path to our host-built LLVM tools
-    project_root = Path(__file__).parent.parent.parent
-    host_bin = project_root / "bld" / "host" / "bin"
-    env["PATH"] = f"{host_bin}:{env.get('PATH', '')}"
-    # nftables depends on libmnl and libnftnl in staging
-    env["PKG_CONFIG_PATH"] = f"{staging_dir}/usr/lib/pkgconfig"
-    return env
+from mods.build import get_build_env
 
 def target_configure(staging_dir: Path, target_dir: Path, arch="x32"):
     colors.info(f"nftables: target_configure ({arch})")
@@ -22,7 +13,7 @@ def target_configure(staging_dir: Path, target_dir: Path, arch="x32"):
     # Generate configure script if it doesn't exist
     if not (repo_root / "configure").exists():
         colors.info("nftables: running autoreconf...")
-        subprocess.run(["autoreconf", "-fi"], cwd=repo_root, env=get_env(staging_dir), check=True)
+        subprocess.run(["autoreconf", "-fi"], cwd=repo_root, env=get_build_env(staging_dir), check=True)
 
     std_flags = os.environ.get("CFLAGS", "")
     static_flags = os.environ.get("CFLAGS_STATIC", std_flags)
@@ -47,13 +38,13 @@ def target_configure(staging_dir: Path, target_dir: Path, arch="x32"):
         f"LDFLAGS={static_flags}",
     ]
     
-    subprocess.run(cmd, cwd=repo_root, env=get_env(staging_dir), check=True)
+    subprocess.run(cmd, cwd=repo_root, env=get_build_env(staging_dir), check=True)
 
 def target_build(staging_dir: Path, target_dir: Path, arch="x32"):
     colors.info(f"nftables: target_build")
     repo_root = Path(__file__).parent
     make_jobs = multiprocessing.cpu_count()
-    subprocess.run(["make", f"-j{make_jobs}"], cwd=repo_root, env=get_env(staging_dir), check=True)
+    subprocess.run(["make", f"-j{make_jobs}"], cwd=repo_root, env=get_build_env(staging_dir), check=True)
 
 def target_install(staging_dir: Path, target_dir: Path, arch="x32"):
     colors.info(f"nftables: target_install")
@@ -61,11 +52,11 @@ def target_install(staging_dir: Path, target_dir: Path, arch="x32"):
     
     # Install to staging
     colors.info(f"nftables: installing to staging {staging_dir}")
-    subprocess.run(["make", f"DESTDIR={staging_dir}", "install"], cwd=repo_root, env=get_env(staging_dir), check=True)
+    subprocess.run(["make", f"DESTDIR={staging_dir}", "install"], cwd=repo_root, env=get_build_env(staging_dir), check=True)
 
     # Install to target
     colors.info(f"nftables: installing to target {target_dir}")
-    subprocess.run(["make", f"DESTDIR={target_dir}", "install"], cwd=repo_root, env=get_env(staging_dir), check=True)
+    subprocess.run(["make", f"DESTDIR={target_dir}", "install"], cwd=repo_root, env=get_build_env(staging_dir), check=True)
     
     # Prune documentation from target
     colors.info(f"nftables: pruning documentation from target...")
